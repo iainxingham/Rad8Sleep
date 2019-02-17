@@ -1,0 +1,19 @@
+---
+title: "Notes"
+author: "IRC"
+date: "17 February 2019"
+output: html_document
+---
+
+## Data loading and cleaning
+
+Keep data out of the git repo - exclude `./Data` in the `.gitignore`.
+
+Cleaning
+
+- read.csv("./Data/file.csv")
+  - Doesn't work as not all columns have header
+- Skip the column headers
+- Convert first column to lubridate dates
+  - Drop any rows without a valid date to get rid of a few rows with no valid data
+- Some rows seem to have the column label incorporated eg "SpO2=000". 
