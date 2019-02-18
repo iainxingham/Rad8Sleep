@@ -3,4 +3,6 @@
 .RData
 .Ruserdata
 
+# Keep any data out of git repo
 Data/
+*.Rproj
