@@ -4,6 +4,7 @@ library(lubridate)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(cowplot)
 
 # Load data
 
@@ -44,3 +45,19 @@ onehour <- interval(dmy_hm("10.2.2019_21:59"), dmy_hm("10.2.2019_22:59"))
 hourtwo <- dmy_hm("10.2.2019_22:59") %--% dmy_hm("10.2.2019_23:59")
 g4 <- ggplot(filter(oxi1, Timepoint %within% onehour), aes(Timepoint, SpO2)) +
   geom_step(colour = "red")
+
+# Split data into hour blocks
+study_period <- range(oxi1$Timepoint)
+seq(min(oxi1$Timepoint), max(oxi1$Timepoint), by="hours")
+t1 <- seq(floor_date(study_period[1], "hour"),
+          ceiling_date(study_period[2], "hour"),
+          by = "hours")
+t2 <- int_diff(t1)
+
+g5 <- ggplot(filter(oxi1, Timepoint %within% t2[2]), aes(Timepoint, SpO2)) +
+  geom_step(colour = "red") +
+  labs(y = "Oxygen saturations", x = "Time")
+g6 <- ggplot(filter(oxi1, Timepoint %within% t2[2]), aes(Timepoint, Pulse)) +
+  geom_step(colour = "blue") +
+  labs(y = "Heart rate", x = "Time")
+plot_grid(g5, g6, ncol = 1)

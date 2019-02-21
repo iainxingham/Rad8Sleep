@@ -17,3 +17,21 @@ Cleaning
 - Convert first column to lubridate dates
   - Drop any rows without a valid date to get rid of a few rows with no valid data
 - Some rows seem to have the column label incorporated eg "SpO2=000". 
+
+## Graphing
+
+`cowplot` ? for combining multiple plots
+Need to set length of x to an hour for first and last plots
+
+## To do
+
+Functions for
+
+- loading raw data from csv and cleaning
+- adjusting time if device clock wasn't correct
+- view length of data and drop unwanted times
+- plot overall / summary oximetry & pulse
+- plot hourly graphs
+- calculate ODI
+
+Report as a .rmd file?
