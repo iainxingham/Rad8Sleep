@@ -5,6 +5,7 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(cowplot)
+library(purrr)
 
 # Load data
 
@@ -54,6 +55,7 @@ t1 <- seq(floor_date(study_period[1], "hour"),
           by = "hours")
 t2 <- int_diff(t1)
 
+# Plot single hour SpO2 and pulse
 g5 <- ggplot(filter(oxi1, Timepoint %within% t2[2]), aes(Timepoint, SpO2)) +
   geom_step(colour = "red") +
   labs(y = "Oxygen saturations", x = "Time")
@@ -61,3 +63,62 @@ g6 <- ggplot(filter(oxi1, Timepoint %within% t2[2]), aes(Timepoint, Pulse)) +
   geom_step(colour = "blue") +
   labs(y = "Heart rate", x = "Time")
 plot_grid(g5, g6, ncol = 1)
+
+# Plot first and last hours with scales
+# t2[1] for first, t2[13] for last
+g7 <- ggplot(filter(oxi1, Timepoint %within% t2[13]), aes(Timepoint, SpO2)) +
+  geom_step(colour = "red") +
+  labs(y = "Oxygen saturations", x = "Time") +
+  xlim(int_start(t2[13]), int_end(t2[13])) + 
+  ylim(70, 100)
+g8 <- ggplot(filter(oxi1, Timepoint %within% t2[13]), aes(Timepoint, Pulse)) +
+  geom_step(colour = "blue") +
+  labs(y = "Heart rate", x = "Time") +
+  xlim(int_start(t2[13]), int_end(t2[13])) +
+  ylim(40, 170)
+plot_grid(g7, g8, ncol = 1)
+
+# Create full hourly plots
+
+# Function for single hour plot
+
+single_hour_plot <- function (oxi_data, xstart, xend, hr_range=c(50,150)) {
+  g1 <- ggplot(oxi_data, aes(Timepoint, SpO2)) +
+    geom_step(colour = "red") +
+    labs(y = "Oxygen saturations", x = "Time") +
+    xlim(xstart, xend) + 
+    ylim(70, 100)
+  g2 <- ggplot(oxi_data, aes(Timepoint, Pulse)) +
+    geom_step(colour = "blue") +
+    labs(y = "Heart rate", x = "Time") +
+    xlim(xstart, xend) +
+    ylim(hr_range[1], hr_range[2])
+  return(plot_grid(g1, g2, ncol = 1))
+}
+
+# single_hour_plot rewritten to take an interval as first arguement to allow use of map()
+single_hour_plot <- function (time_int, oxi_data, oxi_range=c(70,100), hr_range=c(50,150)) {
+  oxi1 <- filter(oxi_data, Timepoint %within% time_int)
+  g1 <- ggplot(oxi1, aes(Timepoint, SpO2)) +
+    geom_step(colour = "red") +
+    labs(y = "Oxygen saturations", x = "Time") +
+    xlim(int_start(time_int), int_end(time_int)) + 
+    ylim(oxi_range[1], oxi_range[2])
+  g2 <- ggplot(oxi1, aes(Timepoint, Pulse)) +
+    geom_step(colour = "blue") +
+    labs(y = "Heart rate", x = "Time") +
+    xlim(int_start(time_int), int_end(time_int)) +
+    ylim(hr_range[1], hr_range[2])
+  return(plot_grid(g1, g2, ncol = 1))  
+}
+
+# Multiple hour plots
+multi_hour_plot <- function (oxi_data) {
+  study_period <- int_diff(
+    seq(floor_date(min(oxi_data$Timepoint), "hour"),
+        ceiling_date(max(oxi_data$Timepoint), "hour"),
+        by = "hours"))
+  
+  hour_plots <- map(study_period, single_hour_plot, oxi_data)
+  return(plot_grid(plotlist = hour_plots, ncol = 1)) # squashed!!
+}
