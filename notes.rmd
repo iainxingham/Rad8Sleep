@@ -35,3 +35,17 @@ Functions for
 - calculate ODI
 
 Report as a .rmd file?
+
+## Calculating ODI
+
+- start with peak of 0, desaturation of 0, max_dip 0
+- whilst SpO2 == 0 move on
+- SpO2 != 0 then
+  - if SpO2 > peak then peak = SpO2 and trough = SpO2
+  - if SpO2 < trough then trough = SpO2
+  - if SpO2 < peak - 4 AND not already counted a desaturation then desaturation++
+  - if SpO2 > trough + 4, clear count and set peak and trough = SpO2
+  - if (peak - trough) > max_dip the max_dip = (peak - trough)
+- make "4" a variable to allow different desaturation thresholds
+
+Use interval length to calculate ODI, time with SpO2 == 0, etc

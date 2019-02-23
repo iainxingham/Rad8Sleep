@@ -129,7 +129,7 @@ multi_hour_plot <- function (oxi_data) {
   return(map(study_period, single_hour_plot, oxi_data))
 }
 
-# Plot to pdf
+# Plot to pdf - incomplete
 sleep_hours_pdf <- function (hour_plots, file="sleep_hours.pdf") {
 
   pdf(file, paper = "a4")
@@ -138,4 +138,47 @@ sleep_hours_pdf <- function (hour_plots, file="sleep_hours.pdf") {
       theme(plot.margin = margin(1, 1, 1, 1, "cm"))
   )
   dev.off()
+}
+
+# Calculate ODI
+calculate_ODI <- function (oxi_data, odi_threshold=4) {
+  peak <- 0
+  trough <- 0
+  max_dip <- 0
+  desaturations <- 0
+  counted <- FALSE
+  
+  for(i in 1:nrow(oxi_data)) {
+    #print(sprintf("i = %d, SpO2 = %d, desaturations = %d, peak = %d, trough = %d, counted = %s", i, oxi_data$SpO2[i], desaturations, peak, trough, counted))
+    
+    if(oxi_data$SpO2[i] == 0) {
+      peak <- 0
+      trough <- 0
+      counted <- FALSE
+      next
+    }
+    
+    if(oxi_data$SpO2[i] > peak) {
+      peak <- oxi_data$SpO2[i]
+      trough <- oxi_data$SpO2[i]
+    }
+    else if(oxi_data$SpO2[i] < trough) {
+      trough <- oxi_data$SpO2[i]
+    }
+    
+    if((oxi_data$SpO2[i] <= (peak - odi_threshold)) && (counted == FALSE)) {
+      desaturations <- desaturations + 1
+      counted <- TRUE
+    }
+    
+    if((peak - trough) > max_dip) max_dip <- peak - trough
+    
+    if(oxi_data$SpO2[i] >= (trough + odi_threshold)) {
+      counted <- FALSE
+      peak <- oxi_data$SpO2[i]
+      trough <- oxi_data$SpO2[i]
+    }
+  }
+  
+  return (list(odi = desaturations, max_desat = max_dip)) # not odi, rather total number of desaturations
 }
