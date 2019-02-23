@@ -99,17 +99,24 @@ single_hour_plot <- function (oxi_data, xstart, xend, hr_range=c(50,150)) {
 # single_hour_plot rewritten to take an interval as first arguement to allow use of map()
 single_hour_plot <- function (time_int, oxi_data, oxi_range=c(70,100), hr_range=c(50,150)) {
   oxi1 <- filter(oxi_data, Timepoint %within% time_int)
+  
   g1 <- ggplot(oxi1, aes(Timepoint, SpO2)) +
     geom_step(colour = "red") +
     labs(y = "Oxygen saturations", x = "Time") +
     xlim(int_start(time_int), int_end(time_int)) + 
-    ylim(oxi_range[1], oxi_range[2])
+    ylim(oxi_range[1], oxi_range[2]) +
+    theme(axis.title = element_text(size = 8),
+          axis.text = element_text(size = 8))
+  
   g2 <- ggplot(oxi1, aes(Timepoint, Pulse)) +
     geom_step(colour = "blue") +
     labs(y = "Heart rate", x = "Time") +
     xlim(int_start(time_int), int_end(time_int)) +
-    ylim(hr_range[1], hr_range[2])
-  return(plot_grid(g1, g2, ncol = 1))  
+    ylim(hr_range[1], hr_range[2]) +
+    theme(axis.title = element_text(size = 8),
+          axis.text = element_text(size = 8))
+  
+  return(plot_grid(g1, g2, ncol = 1) )  # Add a geom_polgon() here to associate the two graphs visually? element_rect()?
 }
 
 # Multiple hour plots
@@ -119,6 +126,16 @@ multi_hour_plot <- function (oxi_data) {
         ceiling_date(max(oxi_data$Timepoint), "hour"),
         by = "hours"))
   
-  hour_plots <- map(study_period, single_hour_plot, oxi_data)
-  return(plot_grid(plotlist = hour_plots, ncol = 1)) # squashed!!
+  return(map(study_period, single_hour_plot, oxi_data))
+}
+
+# Plot to pdf
+sleep_hours_pdf <- function (hour_plots, file="sleep_hours.pdf") {
+
+  pdf(file, paper = "a4")
+  print(
+    plot_grid(plotlist = hour_plots[1:4], ncol = 1) +
+      theme(plot.margin = margin(1, 1, 1, 1, "cm"))
+  )
+  dev.off()
 }
