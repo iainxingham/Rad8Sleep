@@ -312,3 +312,21 @@ summary_plot <- function(oxi_data) {
     ylim(0, 200)
   return(plot_grid(g1, g2, ncol = 1))  
 }
+
+# Results per block
+get_block_result <- function(time_int, oxi_data) {
+  ox <- filter(oxi_data, Timepoint %within% time_int)
+  if(nrow(ox) == 0) return (NA)
+  return (calculate_ODI(ox))
+}
+
+blocks <- data.frame(block = integer(),
+                     total_time = integer(),
+                     oxi_recording_time = integer(),
+                     total_desats = integer(),
+                     odi = double(),
+                     max_desat = integer(),
+                     hr_recording_time = integer(),
+                     total_spikes = integer(),
+                     hri = double(),
+                     max_spikes = integer())

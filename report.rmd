@@ -1,0 +1,198 @@
+---
+title: "Sleep Report"
+author: "From Rad-8 oximeter"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Patient Details
+
+Name: Testy McTestface<br/>  
+Hospital number: <br/>  
+Recording date: 10\\2\\19<br/>  
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+# Libraries and functions
+
+library(lubridate)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(cowplot)
+library(purrr)
+
+# Correct time from oximeter device
+correct_time <- function (oxi_data, add_hours, add_mins) {
+  return(mutate(oxi_data, Timepoint = Timepoint + hours(add_hours) + minutes(add_mins)))
+}
+
+# Calculate ODI
+calculate_ODI <- function (oxi_data, odi_threshold=4) {
+  peak <- 0
+  trough <- 0
+  max_dip <- 0
+  desaturations <- 0
+  counted <- FALSE
+  
+  time_at_zero <- 0
+  last_time_zero <- oxi_data$Timepoint[1] # Initial assignment probably not necessary
+  at_zero <- FALSE
+  
+  for(i in 1:nrow(oxi_data)) {
+
+    if(oxi_data$SpO2[i] == 0) {
+      if(at_zero == TRUE) {
+        time_at_zero <- time_at_zero + int_length(last_time_zero %--% oxi_data$Timepoint[i])
+      }
+      peak <- 0
+      trough <- 0
+      counted <- FALSE
+      at_zero <- TRUE
+      last_time_zero <- oxi_data$Timepoint[i]
+      next
+    } else {
+      at_zero <- FALSE
+    }
+    
+    if(oxi_data$SpO2[i] > peak) {
+      peak <- oxi_data$SpO2[i]
+      trough <- oxi_data$SpO2[i]
+    }
+    else if(oxi_data$SpO2[i] < trough) {
+      trough <- oxi_data$SpO2[i]
+    }
+    
+    if((oxi_data$SpO2[i] <= (peak - odi_threshold)) && (counted == FALSE)) {
+      desaturations <- desaturations + 1
+      counted <- TRUE
+    }
+    
+    if((peak - trough) > max_dip) max_dip <- peak - trough
+    
+    if(oxi_data$SpO2[i] >= (trough + odi_threshold)) {
+      counted <- FALSE
+      peak <- oxi_data$SpO2[i]
+      trough <- oxi_data$SpO2[i]
+    }
+  }
+  
+  return (list(total_time = int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]),
+               recording_time = int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]) - time_at_zero,
+               total_desats = desaturations,
+               odi = (desaturations * 3600) / ((int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]) - time_at_zero)),
+               max_desat = max_dip)) 
+}
+
+# Calculate heart rate index
+calculate_HRI <- function (oxi_data, hri_threshold=6) {
+  peak <- 250
+  trough <- 250
+  max_spike <- 0
+  spikes <- 0
+  counted <- FALSE
+  
+  time_at_zero <- 0
+  last_time_zero <- oxi_data$Timepoint[1] # Initial assignment probably not necessary
+  at_zero <- FALSE
+  
+  for(i in 1:nrow(oxi_data)) {
+     if(oxi_data$Pulse[i] == 0) {
+      if(at_zero == TRUE) {
+        time_at_zero <- time_at_zero + int_length(last_time_zero %--% oxi_data$Timepoint[i])
+      }
+      peak <- 0
+      trough <- 0
+      counted <- FALSE
+      at_zero <- TRUE
+      last_time_zero <- oxi_data$Timepoint[i]
+      next
+    } else {
+      at_zero <- FALSE
+    }
+    
+    if(oxi_data$Pulse[i] > peak) {
+      peak <- oxi_data$Pulse[i]
+    }
+    else if(oxi_data$Pulse[i] < trough) {
+      trough <- oxi_data$Pulse[i]
+      peak <- oxi_data$Pulse[i]
+    }
+    
+    if((oxi_data$Pulse[i] >= (trough + hri_threshold)) && (counted == FALSE)) {
+      spikes <- spikes + 1
+      counted <- TRUE
+    }
+    
+    if((peak - trough) > max_spike) max_spike <- peak - trough
+    
+    if(oxi_data$Pulse[i] <= (peak - hri_threshold)) {
+      counted <- FALSE
+      peak <- oxi_data$Pulse[i]
+      trough <- oxi_data$Pulse[i]
+    }
+  }
+  
+  return (list(total_time = int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]),
+               recording_time = int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]) - time_at_zero,
+               total_spikes = spikes,
+               hri = (spikes * 3600) / ((int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]) - time_at_zero)),
+               max_spike = max_spike)) 
+}
+
+```
+
+```{r echo=FALSE, warning=FALSE}
+# Load data set
+
+oxi <- read.csv("./Data/file.csv",                             # <-- Need to fill this in
+                header = FALSE,
+                skip = 1,
+                stringsAsFactors = FALSE) %>%
+       mutate(Date = mdy(V1)) %>%
+       filter(! is.na(Date)) %>%
+       unite("T3", c("V1", "V2")) %>%
+       extract(V3, c("T1"), "((?<!SpO)[[:digit:]]{1,3})") %>%
+       extract(V4, c("T2"), "([[:digit:]]{1,3})") %>%
+       extract(V7, c("Exception"), "([[:xdigit:]]{4})") %>%
+       transmute(Timepoint = mdy_hms(T3), 
+                 SpO2 = as.integer(T1),
+                 Pulse = as.integer(T2),
+                 Exception = Exception) %>%
+       distinct() %>%
+       correct_time(0, 0)                                      # <-- Need to fill these in
+```
+
+## Summary
+
+```{r echo=FALSE}
+odi_result <- calculate_ODI(oxi)
+hri_result <- calculate_HRI(oxi)
+```
+
+Parameter | Value
+----------|-------
+ODI       | `r round(odi_result$odi, digits = 1)`
+HRI       | `r round(hri_result$hri, digits = 1)`
+Maximum desaturation | `r odi_result$max_desat`
+Total time | `r round(odi_result$total_time / 3600, digits = 2)` hours
+Time with usable data | `r round(odi_result$recording_time / 3600, digits = 2)` hours
+
+## Plot
+
+```{r echo=FALSE, warning=FALSE}
+ggplot(oxi, aes(Timepoint, SpO2)) +
+    geom_step(colour = "red") +
+    labs(y = "Oxygen saturations", x = "Time") +
+    ylim(70, 100)
+
+ggplot(oxi, aes(Timepoint, Pulse)) +
+    geom_step(colour = "blue") +
+    labs(y = "Heart rate", x = "Time") +
+    ylim(0, 200)
+```
