@@ -24,7 +24,8 @@ oxi1 <- oxi %>%
   transmute(Timepoint = mdy_hms(T3) + hours(7) + minutes(2), # time offset specific for particular data file
             SpO2 = as.integer(T1),
             Pulse = as.integer(T2),
-            Exception = Exception)
+            Exception = Exception) %>%
+  distinct()
 
 # Single variable plot
 g1 <- ggplot(oxi1, aes(Timepoint, SpO2)) + geom_step(colour = "red")
@@ -133,10 +134,14 @@ multi_hour_plot <- function (oxi_data) {
 sleep_hours_pdf <- function (hour_plots, file="sleep_hours.pdf") {
 
   pdf(file, paper = "a4")
-  print(
-    plot_grid(plotlist = hour_plots[1:4], ncol = 1) +
-      theme(plot.margin = margin(1, 1, 1, 1, "cm"))
-  )
+  for(i in length(hour_plots)) { 
+    if((i %% 4) == 1) {
+      j <- ifelse((i+3) < length(hour_plots), i+3, length(hour_plots))
+      print(plot_grid(plotlist = hour_plots[i:j], ncol = 1) +
+              theme(plot.margin = margin(1, 1, 1, 1, "cm"))
+      )
+    }
+  }
   dev.off()
 }
 
@@ -148,14 +153,30 @@ calculate_ODI <- function (oxi_data, odi_threshold=4) {
   desaturations <- 0
   counted <- FALSE
   
+  time_at_zero <- 0
+  last_time_zero <- oxi_data$Timepoint[1] # Initial assignment probably not necessary
+  at_zero <- FALSE
+  
+  #debug_log <- data.frame(it = -1, at_z = FALSE, zerotime = 0, time_since = 0, timepoint = now())
+                          
+  
   for(i in 1:nrow(oxi_data)) {
     #print(sprintf("i = %d, SpO2 = %d, desaturations = %d, peak = %d, trough = %d, counted = %s", i, oxi_data$SpO2[i], desaturations, peak, trough, counted))
+    #print(sprintf("i = %d, at_zero = %s, time_at_zero = %d, time_since = %d", i, at_zero, time_at_zero, int_length(last_time_zero %--% oxi_data$Timepoint[i])))
+    #debug_log <- add_row(debug_log, it=i, at_z=at_zero, zerotime=time_at_zero, time_since=int_length(last_time_zero %--% oxi_data$Timepoint[i]), timepoint=oxi_data$Timepoint[i])
     
     if(oxi_data$SpO2[i] == 0) {
+      if(at_zero == TRUE) {
+        time_at_zero <- time_at_zero + int_length(last_time_zero %--% oxi_data$Timepoint[i])
+      }
       peak <- 0
       trough <- 0
       counted <- FALSE
+      at_zero <- TRUE
+      last_time_zero <- oxi_data$Timepoint[i]
       next
+    } else {
+      at_zero <- FALSE
     }
     
     if(oxi_data$SpO2[i] > peak) {
@@ -180,5 +201,114 @@ calculate_ODI <- function (oxi_data, odi_threshold=4) {
     }
   }
   
-  return (list(odi = desaturations, max_desat = max_dip)) # not odi, rather total number of desaturations
+  #return (debug_log)
+  return (list(total_time = int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]),
+               recording_time = int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]) - time_at_zero,
+               total_desats = desaturations,
+               odi = (desaturations * 3600) / ((int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]) - time_at_zero)),
+               max_desat = max_dip)) 
+}
+
+# Wrapper to use map easily on calculate_ODI() 
+odi_block <- function(time_int, oxi_data) {
+  ox <- filter(oxi_data, Timepoint %within% time_int)
+  if(nrow(ox) == 0) return (NA)
+  return (calculate_ODI(ox))
+}
+
+# Load data function
+load_raw_oxi <- function (filename) {
+  oxi <- read.csv(file = filename, 
+                  header = FALSE,
+                  skip = 1,
+                  stringsAsFactors = FALSE)
+  
+  oxi1 <- oxi %>%
+    mutate(Date = mdy(V1)) %>%
+    filter(! is.na(Date)) %>%
+    unite("T3", c("V1", "V2")) %>%
+    extract(V3, c("T1"), "((?<!SpO)[[:digit:]]{1,3})") %>%
+    extract(V4, c("T2"), "([[:digit:]]{1,3})") %>%
+    extract(V7, c("Exception"), "([[:xdigit:]]{4})") %>%
+    transmute(Timepoint = mdy_hms(T3), 
+              SpO2 = as.integer(T1),
+              Pulse = as.integer(T2),
+              Exception = Exception) %>%
+    distinct()
+
+  return (oxi1)
+}
+
+# Calculate heart rate index
+calculate_HRI <- function (oxi_data, hri_threshold=6) {
+  peak <- 250
+  trough <- 250
+  max_spike <- 0
+  spikes <- 0
+  counted <- FALSE
+  
+  time_at_zero <- 0
+  last_time_zero <- oxi_data$Timepoint[1] # Initial assignment probably not necessary
+  at_zero <- FALSE
+  
+  for(i in 1:nrow(oxi_data)) {
+     if(oxi_data$Pulse[i] == 0) {
+      if(at_zero == TRUE) {
+        time_at_zero <- time_at_zero + int_length(last_time_zero %--% oxi_data$Timepoint[i])
+      }
+      peak <- 0
+      trough <- 0
+      counted <- FALSE
+      at_zero <- TRUE
+      last_time_zero <- oxi_data$Timepoint[i]
+      next
+    } else {
+      at_zero <- FALSE
+    }
+    
+    if(oxi_data$Pulse[i] > peak) {
+      peak <- oxi_data$Pulse[i]
+    }
+    else if(oxi_data$Pulse[i] < trough) {
+      trough <- oxi_data$Pulse[i]
+      peak <- oxi_data$Pulse[i]
+    }
+    
+    if((oxi_data$Pulse[i] >= (trough + hri_threshold)) && (counted == FALSE)) {
+      spikes <- spikes + 1
+      counted <- TRUE
+    }
+    
+    if((peak - trough) > max_spike) max_spike <- peak - trough
+    
+    if(oxi_data$Pulse[i] <= (peak - hri_threshold)) {
+      counted <- FALSE
+      peak <- oxi_data$Pulse[i]
+      trough <- oxi_data$Pulse[i]
+    }
+  }
+  
+  return (list(total_time = int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]),
+               recording_time = int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]) - time_at_zero,
+               total_spikes = spikes,
+               hri = (spikes * 3600) / ((int_length(oxi_data$Timepoint[1] %--% oxi_data$Timepoint[nrow(oxi_data)]) - time_at_zero)),
+               max_spike = max_spike)) 
+}
+
+# Correct time from oximeter device
+correct_time <- function (oxi_data, add_hours, add_mins) {
+  return(mutate(oxi_data, Timepoint = Timepoint + hours(add_hours) + minutes(add_mins)))
+}
+
+# Create summary plot
+summary_plot <- function(oxi_data) {
+  g1 <- ggplot(oxi_data, aes(Timepoint, SpO2)) +
+    geom_step(colour = "red") +
+    labs(y = "Oxygen saturations", x = "Time") +
+    ylim(70, 100)
+  g2 <- ggplot(oxi_data, aes(Timepoint, Pulse)) +
+    geom_step(colour = "blue") +
+    labs(y = "Heart rate", x = "Time") +
+    ylim(0, 200)
+  return(plot_grid(g1, g2, ncol = 1))  
 }

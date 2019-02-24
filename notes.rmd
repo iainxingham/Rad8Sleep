@@ -18,6 +18,8 @@ Cleaning
   - Drop any rows without a valid date to get rid of a few rows with no valid data
 - Some rows seem to have the column label incorporated eg "SpO2=000". 
 
+It appears some rows are duplicated - appearing with and without incorporated column labels
+
 ## Graphing
 
 `cowplot` ? for combining multiple plots
