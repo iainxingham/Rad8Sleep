@@ -14,7 +14,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Name: Testy McTestface<br/>  
 Hospital number: <br/>  
-Recording date: 10\\2\\19<br/>  
+Date of birth:   
+  
+Recording date: <br/>  
+
+Notes:  
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
 
@@ -156,6 +160,8 @@ oxi <- read.csv("./Data/file.csv",                             # <-- Need to fil
                 stringsAsFactors = FALSE) %>%
        mutate(Date = mdy(V1)) %>%
        filter(! is.na(Date)) %>%
+       mutate(Time = hms(V2)) %>%
+       filter(! is.na(Time)) %>%
        unite("T3", c("V1", "V2")) %>%
        extract(V3, c("T1"), "((?<!SpO)[[:digit:]]{1,3})") %>%
        extract(V4, c("T2"), "([[:digit:]]{1,3})") %>%
@@ -165,7 +171,10 @@ oxi <- read.csv("./Data/file.csv",                             # <-- Need to fil
                  Pulse = as.integer(T2),
                  Exception = Exception) %>%
        distinct() %>%
-       correct_time(0, 0)                                      # <-- Need to fill these in
+     # Random additional cleaning
+     #  filter(Timepoint %within% (dmy_hms("10/1/2005 00:00:00") %--% dmy_hms("10/1/2005 23:59:59"))) %>%
+     #  mutate(Timepoint = Timepoint + years(14) + months(1) + days(14)) %>%
+       correct_time(8, 1)                                      # <-- Need to fill these in
 ```
 
 ## Summary

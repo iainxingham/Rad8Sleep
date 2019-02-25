@@ -226,6 +226,8 @@ load_raw_oxi <- function (filename) {
   oxi1 <- oxi %>%
     mutate(Date = mdy(V1)) %>%
     filter(! is.na(Date)) %>%
+    mutate(Time = hms(V2)) %>%
+    filter(! is.na(Time)) %>%
     unite("T3", c("V1", "V2")) %>%
     extract(V3, c("T1"), "((?<!SpO)[[:digit:]]{1,3})") %>%
     extract(V4, c("T2"), "([[:digit:]]{1,3})") %>%
