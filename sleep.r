@@ -332,3 +332,35 @@ blocks <- data.frame(block = integer(),
                      total_spikes = integer(),
                      hri = double(),
                      max_spikes = integer())
+
+# Time in particular saturation range
+calculate_sats <- function (oxi_data) {
+  sats_acc <- list(total=0, no_rec=0, b70=0, b80=0, b90=0, t88_92=0, t94_98=0)
+  
+  reduce(split(oxi_data, seq_len(nrow(oxi_data))),
+         get_sats_data,
+         .init = sats_acc)
+}
+
+get_sats_data <- function(acc, oxi_row) {
+  # Deal with the first reading - no time elapsed
+  if(is.na(oxi_row$time_int)) return (acc)
+  
+  acc$total <- acc$total + oxi_row$time_int
+  if(oxi_row$SpO2 == 0) acc$no_rec <- acc$no_rec + oxi_row$time_int
+  else {
+    if(oxi_row$SpO2 < 70) acc$b70 <- acc$b70 + oxi_row$time_int
+    if(oxi_row$SpO2 < 80) acc$b80 <- acc$b80 + oxi_row$time_int
+    if(oxi_row$SpO2 < 90) acc$b90 <- acc$b90 + oxi_row$time_int
+    if((oxi_row$SpO2 < 93) && (oxi_row$SpO2 > 87)) 
+      acc$t88_92 <- acc$t88_92 + oxi_row$time_int
+    if((oxi_row$SpO2 < 99) && (oxi_row$SpO2 > 93)) 
+      acc$t94_98 <- acc$t94_98 + oxi_row$time_int
+  }
+  
+  return (acc)
+}
+
+sats_dat <- oxi1 %>% 
+  mutate(time_int = int_length(lag(Timepoint) %--% Timepoint)) %>%
+  calculate_sats()

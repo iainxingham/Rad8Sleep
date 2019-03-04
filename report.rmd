@@ -14,11 +14,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Name: Testy McTestface<br/>  
 Hospital number: <br/>  
-Date of birth:   
+Date of birth:  <br/>   
   
 Recording date: <br/>  
 
-Notes:  
+Notes: <br/>  
+
+Report: <br/>  
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
 
